@@ -1,0 +1,236 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Merry Christmas! Signed: Dr. Ernesto Cancho</title>
+
+  <style>
+    /* ES: Página a pantalla completa, sin scroll | EN: Fullscreen page, no scroll */
+    html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #000; }
+
+    /* ES: Barra de título superpuesta | EN: Overlay title bar */
+    #titlebar {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      padding: 10px 14px;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      font-size: 16px;
+      color: #fff;
+      background: linear-gradient(to bottom, rgba(0,0,0,0.75), rgba(0,0,0,0.0));
+      pointer-events: none;
+      z-index: 10;
+      text-align: center;
+      letter-spacing: 0.2px;
+    }
+
+    /* ES: Ayuda mínima | EN: Minimal help */
+    #hint {
+      position: fixed;
+      bottom: 10px; left: 10px;
+      padding: 8px 10px;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      font-size: 12px;
+      color: rgba(255,255,255,0.85);
+      background: rgba(0,0,0,0.35);
+      border-radius: 10px;
+      z-index: 10;
+      pointer-events: none;
+      max-width: 360px;
+    }
+  </style>
+
+  <!--
+    ES: Carga p5.js desde CDN (recomendado para hosting estático).
+    EN: Loads p5.js from CDN (recommended for static hosting).
+  -->
+  <script src="https://cdn.jsdelivr.net/npm/p5@1.9.4/lib/p5.min.js"></script>
+</head>
+
+<body>
+  <div id="titlebar">Merry Chrsitmas! Signed: Dr. Ernesto Cancho</div>
+  <div id="hint">Mouse: arrastra para orbitar • Rueda: zoom • Touch: arrastra / pellizca</div>
+
+  <script>
+    // =========================
+    // Árbol 3D con hélice cónica (p5.js WEBGL)
+    // Spanish: Usa las ecuaciones x(z), y(z) de la imagen para dibujar una guirnalda en espiral sobre un cono.
+    // English: Uses the image equations x(z), y(z) to draw a spiral garland over a cone.
+    // =========================
+
+    let pts = [];                 // ES: Puntos de la hélice | EN: Helix points
+    let pts2 = [];                // ES: Segunda hélice (opcional) | EN: Second helix (optional)
+
+    // -------------------------
+    // ES: Parámetros del “árbol” (ajústalos a gusto)
+    // EN: “Tree” parameters (tweak as you like)
+    // -------------------------
+    let h = 520;                  // ES: Altura del árbol | EN: Tree height
+    let rBase = 220;              // ES: Radio en la base | EN: Base radius
+    let nTurns = 9;               // ES: Número de vueltas n | EN: Number of turns n
+    let samples = 1400;           // ES: Resolución de muestreo | EN: Sampling resolution
+
+    function setup() {
+      // ES: Lienzo WEBGL | EN: WEBGL canvas
+      createCanvas(windowWidth, windowHeight, WEBGL);
+
+      // ES: Precalcular puntos de la hélice principal | EN: Precompute main helix points
+      pts = buildConicalHelixPoints(h, rBase, nTurns, samples, 0.0);
+
+      // ES: Precalcular una segunda hélice con desfase angular (decoración extra) | EN: Second helix with phase offset
+      pts2 = buildConicalHelixPoints(h, rBase * 0.92, nTurns, samples, Math.PI / 4);
+
+      // ES: Suaviza bordes (depende del navegador/GPU) | EN: Smooth edges (depends on browser/GPU)
+      smooth();
+    }
+
+    function draw() {
+      // ES: Fondo negro | EN: Black background
+      background(0);
+
+      // ES: Control orbital con mouse (arrastrar/zoom) | EN: Orbit control with mouse (drag/zoom)
+      orbitControl();
+
+      // ES: Iluminación básica | EN: Basic lighting
+      ambientLight(40);                                  // ES: Luz ambiente | EN: Ambient light
+      directionalLight(255, 255, 255, -0.2, -1, -0.2);    // ES: Luz direccional | EN: Directional light
+
+      // ES: Centrar “suelo” para que el árbol se vea completo | EN: Center “ground” so tree fits view
+      translate(0, h * 0.10, 0);
+
+      // ES: Rotación lenta automática | EN: Slow auto-rotation
+      rotateY(frameCount * 0.002);
+
+      // =========================
+      // ES: Dibujar el cuerpo del árbol (cono)
+      // EN: Draw tree body (cone)
+      // =========================
+      push();                                            // ES: Guardar transform | EN: Save transform
+      noStroke();                                        // ES: Sin borde | EN: No outline
+      ambientMaterial(10, 80, 25);                       // ES: Verde oscuro | EN: Dark green
+      rotateX(Math.PI);                                  // ES: Invertir para que apunte hacia arriba | EN: Flip so it points upward
+      cone(rBase * 0.98, h, 48, 12);                      // ES: Cono base | EN: Base cone
+      pop();                                             // ES: Restaurar transform | EN: Restore transform
+
+      // =========================
+      // ES: Dibujar guirnalda 1 (hélice cónica)
+      // EN: Draw garland 1 (conical helix)
+      // =========================
+      drawGarland(pts, color(255, 200, 80), 3.2);
+
+      // =========================
+      // ES: Dibujar guirnalda 2 (opcional, más fina)
+      // EN: Draw garland 2 (optional, thinner)
+      // =========================
+      drawGarland(pts2, color(255, 170, 60), 2.0);
+
+      // =========================
+      // ES: “Luces” (esferas pequeñas) sobre la guirnalda
+      // EN: “Lights” (small spheres) on the garland
+      // =========================
+      drawLightsOnGarland(pts, 55, 6.0);
+
+      // =========================
+      // ES: Estrella superior simple
+      // EN: Simple top star
+      // =========================
+      drawTopStar(h);
+    }
+
+    function buildConicalHelixPoints(H, R, n, N, phase) {
+      // ES: Construye puntos (x(z), y(z), z) usando las ecuaciones de la imagen
+      // EN: Builds points (x(z), y(z), z) using the image equations
+      let arr = [];                                     // ES: Arreglo de puntos | EN: Points array
+
+      for (let i = 0; i <= N; i++) {                    // ES: Muestreo 0..N | EN: Sample 0..N
+        let z = (H * i) / N;                            // ES: z ∈ [0, H] | EN: z ∈ [0, H]
+
+        // ES: Factor (h - z)/h | EN: Factor (h - z)/h
+        let f = (H - z) / H;
+
+        // ES: Ángulo 2π n z / h (+ fase) | EN: Angle 2π n z / h (+ phase)
+        let theta = (TWO_PI * n * z) / H + phase;
+
+        // ES: Ecuaciones: x = f*r*cos(theta), y = f*r*sin(theta)
+        // EN: Equations: x = f*r*cos(theta), y = f*r*sin(theta)
+        let x = f * R * Math.cos(theta);
+        let y = f * R * Math.sin(theta);
+
+        // ES: Mapear a p5 WEBGL: (x, vertical, zDepth) = (x, -z, y)
+        // EN: Map to p5 WEBGL: (x, vertical, zDepth) = (x, -z, y)
+        let px = x;
+        let py = -z + H / 2;                            // ES: Centrar altura | EN: Center height
+        let pz = y;
+
+        arr.push(createVector(px, py, pz));             // ES: Guardar punto | EN: Store point
+      }
+
+      return arr;                                        // ES: Retornar puntos | EN: Return points
+    }
+
+    function drawGarland(points, strokeCol, sw) {
+      // ES: Dibuja una línea 3D conectando los puntos | EN: Draws a 3D line connecting points
+      push();                                            // ES: Guardar estado | EN: Save state
+      noFill();                                          // ES: Sin relleno | EN: No fill
+      stroke(strokeCol);                                 // ES: Color del trazo | EN: Stroke color
+      strokeWeight(sw);                                  // ES: Grosor | EN: Thickness
+
+      beginShape();                                      // ES: Iniciar polilínea | EN: Start polyline
+      for (let i = 0; i < points.length; i++) {          // ES: Recorrer puntos | EN: Loop points
+        let v = points[i];                               // ES: Punto actual | EN: Current point
+        vertex(v.x, v.y, v.z);                           // ES: Vértice | EN: Vertex
+      }
+      endShape();                                        // ES: Terminar polilínea | EN: End polyline
+      pop();                                             // ES: Restaurar estado | EN: Restore state
+    }
+
+    function drawLightsOnGarland(points, step, size) {
+      // ES: Coloca “bombillitos” cada cierto número de puntos | EN: Places “bulbs” every N points
+      push();                                            // ES: Guardar estado | EN: Save state
+      noStroke();                                        // ES: Sin borde | EN: No outline
+
+      for (let i = 0; i < points.length; i += step) {    // ES: Saltos | EN: Steps
+        let v = points[i];                               // ES: Punto | EN: Point
+
+        // ES: Variar color ligeramente con el índice | EN: Slight color variation with index
+        let t = (i / points.length) * 255;               // ES: Parámetro 0..255 | EN: Parameter 0..255
+        emissiveMaterial(200 + (t % 55), 140 + (t % 70), 60 + (t % 40)); // ES: Brillo | EN: Glow
+
+        push();                                          // ES: Guardar transform local | EN: Save local transform
+        translate(v.x, v.y, v.z);                        // ES: Ir a la posición | EN: Move to position
+        sphere(size, 10, 8);                             // ES: Esfera-luz | EN: Light sphere
+        pop();                                           // ES: Restaurar transform local | EN: Restore local transform
+      }
+
+      pop();                                             // ES: Restaurar estado | EN: Restore state
+    }
+
+    function drawTopStar(H) {
+      // ES: Dibuja una “estrella” simple (dos conos cruzados) | EN: Draw a simple “star” (two crossed cones)
+      push();                                            // ES: Guardar estado | EN: Save state
+      let yTop = -H / 2;                                 // ES: Punto superior aproximado | EN: Approx top point
+
+      translate(0, yTop - 20, 0);                        // ES: Posicionar arriba | EN: Position near top
+      rotateY(frameCount * 0.01);                        // ES: Giro | EN: Spin
+      noStroke();                                        // ES: Sin borde | EN: No outline
+      emissiveMaterial(255, 210, 90);                    // ES: Dorado brillante | EN: Bright gold
+
+      push();                                            // ES: Primer cono | EN: First cone
+      cone(18, 55, 18, 6);                               // ES: Cono vertical | EN: Vertical cone
+      pop();                                             // ES: Fin primer cono | EN: End first cone
+
+      push();                                            // ES: Segundo cono (cruzado) | EN: Second cone (crossed)
+      rotateZ(HALF_PI);                                  // ES: Rotar 90° | EN: Rotate 90°
+      cone(18, 55, 18, 6);                               // ES: Cono horizontal | EN: Horizontal cone
+      pop();                                             // ES: Fin segundo cono | EN: End second cone
+
+      pop();                                             // ES: Restaurar estado | EN: Restore state
+    }
+
+    function windowResized() {
+      // ES: Ajustar canvas al cambiar tamaño | EN: Resize canvas on window resize
+      resizeCanvas(windowWidth, windowHeight);
+    }
+  </script>
+</body>
+</html>
